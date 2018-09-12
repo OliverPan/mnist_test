@@ -34,7 +34,7 @@ def train(mnist):
     weights2 = tf.Variable(tf.truncated_normal([LAYER1_NODE, OUTPUT_NODE], stddev=0.1))
     biases2 = tf.Variable(tf.constant(0.1, shape=[OUTPUT_NODE]))
 
-    y = inference((x, None, weights1, biases1, weights2, biases2))
+    y = inference(x, None, weights1, biases1, weights2, biases2)
 
     global_step = tf.Variable(0, trainable=False)
 
@@ -58,3 +58,38 @@ def train(mnist):
         LEARNING_RATE_DECAY)
 
     train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss, global_step=global_step)
+
+    with tf.control_dependencies([train_step, variables_averages_op]):
+        train_op = tf.no_op(name='train')
+
+    correct_prediction = tf.equal(tf.argmax(average_y, 1), tf.argmax(y_, 1))
+
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+    with tf.Session() as sess:
+        tf.global_variables_initializer().run()
+        validate_feed = {x: mnist.validation.images, y_: mnist.validation.labels}
+
+        test_feed = {x: mnist.test.images, y_: mnist.test.labels}
+
+        for i in range(TRAINING_STEPS):
+            if i%1000 == 0:
+                validate_acc = sess.run(accuracy, feed_dict=validate_feed)
+                print("After %d training step(s), validation accuracy "
+                      "using average model is %g" % (i, validate_acc))
+
+        xs, ys = mnist.train.next_batch(BATCH_SIZE)
+        sess.run(train_op, feed_dict={x: xs, y_: ys})
+
+        test_acc = sess.run(accuracy, feed_dict=test_feed)
+        print("After %d training step(s), test accuracy using average "
+              "model is %g" % (TRAINING_STEPS, test_acc))
+
+
+def main(argv=None):
+    mnist = input_data.read_data_sets("./tmp/data", one_hot=True)
+    train(mnist)
+
+
+if __name__ == "__main__":
+    tf.app.run()
